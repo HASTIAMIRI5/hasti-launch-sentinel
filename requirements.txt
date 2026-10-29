@@ -1,0 +1,40 @@
+from app.services.data_store import assess_launch
+
+
+def test_assess_launch_returns_high_readiness_for_good_plan():
+    launch = {
+        "id": "launch-1",
+        "product_name": "Nimbus AI",
+        "launch_date": "2026-11-20",
+        "team": "Growth",
+        "market": "US Enterprise",
+        "status": "active",
+        "milestones": [
+            {"id": "a", "name": "Research", "owner": "PM", "status": "done", "priority": "high"},
+            {"id": "b", "name": "Prototype", "owner": "Design", "status": "done", "priority": "critical"},
+            {"id": "c", "name": "QA", "owner": "Eng", "status": "in_progress", "priority": "critical"},
+            {"id": "d", "name": "Comms", "owner": "Marketing", "status": "todo", "priority": "medium"},
+        ],
+    }
+
+    assessment = assess_launch(launch)
+    assert 0 <= assessment.readiness_score <= 100
+    assert assessment.risk_level in {"healthy", "monitor", "watch", "critical"}
+    assert isinstance(assessment.findings, list)
+
+
+def test_assess_launch_flags_blocked_critical_work():
+    launch = {
+        "id": "launch-2",
+        "product_name": "Orbit",
+        "launch_date": "2026-10-31",
+        "milestones": [
+            {"id": "x", "name": "Legal review", "owner": "Legal", "status": "blocked", "priority": "critical"},
+            {"id": "y", "name": "Threat model", "owner": "Security", "status": "blocked", "priority": "critical"},
+            {"id": "z", "name": "Landing page", "owner": "Marketing", "status": "todo", "priority": "medium"},
+        ],
+    }
+
+    assessment = assess_launch(launch)
+    assert assessment.risk_level in {"watch", "critical"}
+    assert any(item.risk_type == "blocked work" for item in assessment.findings)

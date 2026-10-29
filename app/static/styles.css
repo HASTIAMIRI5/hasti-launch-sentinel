@@ -1,0 +1,118 @@
+const launchForm = document.getElementById('launchForm');
+const launchList = document.getElementById('launchList');
+const activeLaunches = document.getElementById('activeLaunches');
+const avgReadiness = document.getElementById('avgReadiness');
+const criticalAlerts = document.getElementById('criticalAlerts');
+const refreshBtn = document.getElementById('refreshBtn');
+
+const defaultMilestones = [
+  {
+    id: 'm1',
+    name: 'Core feature validation',
+    owner: 'PM',
+    status: 'done',
+    priority: 'critical',
+    dependency_ids: []
+  },
+  {
+    id: 'm2',
+    name: 'Pricing lock',
+    owner: 'Finance',
+    status: 'in_progress',
+    priority: 'high',
+    dependency_ids: ['m1']
+  },
+  {
+    id: 'm3',
+    name: 'Launch comms readiness',
+    owner: 'Marketing',
+    status: 'blocked',
+    priority: 'critical',
+    dependency_ids: ['m2']
+  }
+];
+
+async function fetchLaunches() {
+  const res = await fetch('/api/launches');
+  const launches = await res.json();
+  renderLaunches(launches);
+  updateSummary(launches);
+}
+
+function renderLaunches(launches) {
+  if (!Array.isArray(launches) || launches.length === 0) {
+    launchList.innerHTML = '<div class="empty-state">No launches tracked yet.</div>';
+    return;
+  }
+
+  launchList.innerHTML = launches.map((launch) => {
+    const readScore = launch.assessment?.readiness_score ?? 0;
+    const riskLevel = launch.assessment?.risk_level ?? 'monitor';
+    const summary = launch.assessment?.summary ?? 'Assessment pending';
+
+    return `
+      <article class="launch-card ${riskLevel}">
+        <div class="launch-header">
+          <div>
+            <h4>${launch.product_name}</h4>
+            <p>${launch.market} • ${launch.team}</p>
+          </div>
+          <span class="badge ${riskLevel}">${riskLevel}</span>
+        </div>
+        <div class="score-row">
+          <div>
+            <span>Readiness</span>
+            <strong>${readScore}%</strong>
+          </div>
+          <div>
+            <span>Launch date</span>
+            <strong>${launch.launch_date || 'TBD'}</strong>
+          </div>
+        </div>
+        <p class="summary">${summary}</p>
+        <ul class="milestone-summary">
+          ${(launch.milestones || []).slice(0, 4).map((item) => `<li>${item.name} • ${item.status}</li>`).join('') || '<li>No milestones yet</li>'}
+        </ul>
+      </article>
+    `;
+  }).join('');
+}
+
+function updateSummary(launches) {
+  const count = launches.length;
+  const avg = count
+    ? Math.round(launches.reduce((acc, launch) => acc + (launch.assessment?.readiness_score ?? 0), 0) / count)
+    : 0;
+  const critical = launches.filter((launch) => (launch.assessment?.risk_level ?? 'monitor') === 'critical').length;
+
+  activeLaunches.textContent = String(count);
+  avgReadiness.textContent = `${avg}%`;
+  criticalAlerts.textContent = String(critical);
+}
+
+launchForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(launchForm);
+  const payload = {
+    product_name: formData.get('product_name'),
+    launch_date: formData.get('launch_date') || null,
+    market: formData.get('market'),
+    team: formData.get('team'),
+    status: formData.get('status'),
+    milestones: defaultMilestones
+  };
+
+  const response = await fetch('/api/launches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (response.ok) {
+    launchForm.reset();
+    await fetchLaunches();
+  }
+});
+
+refreshBtn.addEventListener('click', fetchLaunches);
+fetchLaunches();

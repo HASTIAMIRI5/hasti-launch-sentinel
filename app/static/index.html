@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+from app.services.data_store import assess_launch, load_launches, save_launches
+
+router = APIRouter(prefix="/api")
+
+
+@router.get("/health")
+def healthcheck():
+    return {"status": "ok", "service": "hasti-launch-sentinel"}
+
+
+@router.get("/launches")
+def list_launches():
+    return load_launches()
+
+
+@router.post("/launches")
+def create_launch(payload: dict):
+    launch = {
+        "id": payload.get("id") or payload.get("product_name", "launch").lower().replace(" ", "-") + "-1",
+        "product_name": payload.get("product_name", "Untitled launch"),
+        "launch_date": payload.get("launch_date"),
+        "market": payload.get("market", "General market"),
+        "team": payload.get("team", "Product team"),
+        "status": payload.get("status", "planned"),
+        "milestones": payload.get("milestones", []),
+    }
+    assessment = assess_launch(launch)
+    launch["assessment"] = assessment.model_dump()
+    existing = load_launches()
+    existing.append(launch)
+    save_launches(existing)
+    return launch
+
+
+@router.get("/launches/{launch_id}")
+def get_launch(launch_id: str):
+    for launch in load_launches():
+        if launch.get("id") == launch_id:
+            return launch
+    return {"detail": "Launch not found"}, 404
+
+
+@router.post("/launches/{launch_id}/assess")
+def assess_specific_launch(launch_id: str):
+    launches = load_launches()
+    for launch in launches:
+        if launch.get("id") == launch_id:
+            assessment = assess_launch(launch)
+            launch["assessment"] = assessment.model_dump()
+            save_launches(launches)
+            return launch
+    return {"detail": "Launch not found"}, 404
