@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,26 +8,26 @@ from pydantic import BaseModel, Field
 class Task(BaseModel):
     id: str
     name: str
-    owner: str
-    status: str = "todo"
-    priority: str = "medium"
-    due_date: str | None = None
+    owner: str = "Unassigned"
+    status: Literal["todo", "in_progress", "done", "blocked"] = "todo"
+    priority: Literal["low", "medium", "high", "critical"] = "medium"
+    due_date: Optional[str] = None
     dependency_ids: list[str] = Field(default_factory=list)
 
 
 class Launch(BaseModel):
     id: str
     product_name: str
-    launch_date: str | None = None
+    launch_date: Optional[str] = None
     market: str = "General market"
     team: str = "Product team"
-    status: str = "planned"
+    status: Literal["planned", "active", "at_risk", "launched"] = "planned"
     milestones: list[Task] = Field(default_factory=list)
 
 
 class RiskFinding(BaseModel):
     risk_type: str
-    severity: str
+    severity: Literal["low", "medium", "high", "critical"]
     score: int
     message: str
     recommendation: str
@@ -38,7 +37,7 @@ class RiskFinding(BaseModel):
 class LaunchAssessment(BaseModel):
     launch_id: str
     readiness_score: int
-    risk_level: str
+    risk_level: Literal["healthy", "monitor", "watch", "critical"]
     launch_window: str
     summary: str
     findings: list[RiskFinding] = Field(default_factory=list)

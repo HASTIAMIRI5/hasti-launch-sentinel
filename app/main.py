@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router as api_router
 
@@ -16,10 +16,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
 app.include_router(api_router)
 
 
 @app.get("/")
-def root():
-    return FileResponse(str(BASE_DIR / "static" / "index.html"))
+def root() -> FileResponse:
+    return FileResponse(str(BASE_DIR / "app" / "static" / "index.html"))
