@@ -1,67 +1,115 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hasti Launch Sentinel</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Launch intelligence</p>
-          <h1>Hasti Launch Sentinel</h1>
-        </div>
-        <button id="refreshBtn" class="secondary-btn">Refresh</button>
-      </header>
+const form = document.getElementById('launch-form');
+const list = document.getElementById('launch-list');
+const refreshBtn = document.getElementById('refresh-btn');
+const activeLaunches = document.getElementById('active-launches');
+const avgReadiness = document.getElementById('avg-readiness');
+const criticalAlerts = document.getElementById('critical-alerts');
 
-      <main class="dashboard">
-        <section class="panel hero-panel">
-          <div>
-            <p class="eyebrow">Portfolio overview</p>
-            <h2>AI-powered launch risk detection</h2>
+const defaultMilestones = [
+  {
+    id: 'm1',
+    name: 'Core feature validation',
+    owner: 'PM',
+    status: 'done',
+    priority: 'critical',
+    dependency_ids: [],
+  },
+  {
+    id: 'm2',
+    name: 'Pricing lock',
+    owner: 'Finance',
+    status: 'in_progress',
+    priority: 'high',
+    dependency_ids: ['m1'],
+  },
+  {
+    id: 'm3',
+    name: 'Launch comms readiness',
+    owner: 'Marketing',
+    status: 'blocked',
+    priority: 'critical',
+    dependency_ids: ['m2'],
+  },
+];
+
+async function fetchDashboard() {
+  const res = await fetch('/api/dashboard');
+  const data = await res.json();
+  renderLaunches(data.launches || []);
+  renderSummary(data.summary || {});
+}
+
+function renderSummary(summary) {
+  activeLaunches.textContent = String(summary.active_launches ?? 0);
+  avgReadiness.textContent = `${summary.average_readiness ?? 0}%`;
+  criticalAlerts.textContent = String(summary.critical_alerts ?? 0);
+}
+
+function renderLaunches(launches) {
+  if (!launches.length) {
+    list.innerHTML = '<div class="empty-state">No launches tracked yet.</div>';
+    return;
+  }
+
+  list.innerHTML = launches
+    .map((launch) => {
+      const assessment = launch.assessment || {};
+      const readiness = assessment.readiness_score ?? 0;
+      const riskLevel = assessment.risk_level || 'monitor';
+      const summary = assessment.summary || 'Assessment pending';
+
+      return `
+        <article class="launch-card ${riskLevel}">
+          <div class="launch-header">
+            <div>
+              <h4>${launch.product_name}</h4>
+              <p>${launch.market} • ${launch.team}</p>
+            </div>
+            <span class="badge ${riskLevel}">${riskLevel}</span>
           </div>
-          <div class="hero-metrics">
-            <div class="metric-card">
-              <span>Active launches</span>
-              <strong id="activeLaunches">0</strong>
+          <div class="score-row">
+            <div>
+              <span>Readiness</span>
+              <strong>${readiness}%</strong>
             </div>
-            <div class="metric-card">
-              <span>Average readiness</span>
-              <strong id="avgReadiness">0%</strong>
-            </div>
-            <div class="metric-card danger">
-              <span>Critical alerts</span>
-              <strong id="criticalAlerts">0</strong>
+            <div>
+              <span>Launch date</span>
+              <strong>${launch.launch_date || 'TBD'}</strong>
             </div>
           </div>
-        </section>
+          <p class="summary">${summary}</p>
+          <ul class="milestone-summary">
+            ${(launch.milestones || []).slice(0, 4).map((item) => `<li>${item.name} • ${item.status}</li>`).join('') || '<li>No milestones yet</li>'}
+          </ul>
+        </article>
+      `;
+    })
+    .join('');
+}
 
-        <section class="panel">
-          <h3>Create launch</h3>
-          <form id="launchForm" class="launch-form">
-            <input type="text" name="product_name" placeholder="Product name" required />
-            <input type="date" name="launch_date" />
-            <input type="text" name="market" placeholder="Market" value="US Enterprise" />
-            <input type="text" name="team" placeholder="Team" value="Product + Growth" />
-            <select name="status">
-              <option value="planned">Planned</option>
-              <option value="active">Active</option>
-              <option value="at_risk">At risk</option>
-              <option value="launched">Launched</option>
-            </select>
-            <button type="submit">Add launch</button>
-          </form>
-        </section>
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(form);
+  const payload = {
+    product_name: formData.get('product_name'),
+    launch_date: formData.get('launch_date') || null,
+    market: formData.get('market'),
+    team: formData.get('team'),
+    status: formData.get('status'),
+    milestones: defaultMilestones,
+  };
 
-        <section class="panel">
-          <h3>Launch portfolio</h3>
-          <div id="launchList" class="launch-list"></div>
-        </section>
-      </main>
-    </div>
+  const res = await fetch('/api/launches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 
-    <script src="/static/app.js"></script>
-  </body>
-</html>
+  if (res.ok) {
+    form.reset();
+    fetchDashboard();
+  }
+});
+
+refreshBtn.addEventListener('click', fetchDashboard);
+fetchDashboard();
